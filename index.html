@@ -876,8 +876,8 @@ function renderSites(pane) {
   `;
 }
 function renderQRBlock(s) {
-  const base = window.location.origin + window.location.pathname;
-  const url = `${base}${base.includes('?')?'&':'?'}site=${s.id}`;
+  const base = 'https://andreivaculea-blip.github.io/klok-app';
+  const url = base + '?site=' + s.id;
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(url)}&bgcolor=ffffff&color=0a0f1a&margin=8`;
   return `<div class="qr-wrap">
     <div style="font-size:13px;color:#f59e0b;font-weight:700;margin-bottom:4px">📲 Scan to Sign In / Out</div>
