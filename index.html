@@ -467,11 +467,9 @@ function workerSelectName(name) { STATE.workerName = name; workerSearchVal = '';
 function setWorkerAction(a) { STATE.workerAction = a; renderWorkerStep(); }
 
 function workerToGPS() {
-  STATE.workerStep = 'gps';
-  STATE.gpsStatus = 'pending';
-  STATE.gpsDistance = null;
-  renderWorkerStep();
-  doGPSCheck();
+  STATE.gpsStatus = 'ok';
+  STATE.gpsDistance = 0;
+  workerSubmit();
 }
 
 function renderWorkerGPS(body) {
