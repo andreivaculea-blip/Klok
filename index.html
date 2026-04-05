@@ -403,6 +403,7 @@ function renderWorkerStep() {
 
   if (STATE.workerStep === 'select-site') renderWorkerSelectSite(body);
   else if (STATE.workerStep === 'form') renderWorkerForm(body);
+  else if (STATE.workerStep === 'selfie') renderWorkerSelfie(body);
   else if (STATE.workerStep === 'gps') renderWorkerGPS(body);
   else if (STATE.workerStep === 'done') renderWorkerDone(body);
 }
@@ -467,8 +468,93 @@ function workerSelectName(name) { STATE.workerName = name; workerSearchVal = '';
 function setWorkerAction(a) { STATE.workerAction = a; renderWorkerStep(); }
 
 function workerToGPS() {
-  STATE.gpsStatus = 'ok';
-  STATE.gpsDistance = 0;
+  STATE.workerStep = 'selfie';
+  STATE.selfieData = null;
+  renderWorkerStep();
+}
+
+let selfieStream = null;
+
+function renderWorkerSelfie(body) {
+  body.innerHTML = `
+    <div class="step-label">Take Selfie</div>
+    <div style="background:#111827;border-radius:16px;overflow:hidden;position:relative;aspect-ratio:3/4;max-height:360px">
+      <video id="selfieVideo" autoplay playsinline muted style="width:100%;height:100%;object-fit:cover;display:block"></video>
+      <canvas id="selfieCanvas" style="display:none"></canvas>
+      <img id="selfiePreview" style="width:100%;height:100%;object-fit:cover;display:none;border-radius:16px" />
+      <div id="selfieOverlay" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.5)">
+        <div class="spinner"></div>
+      </div>
+    </div>
+    <div id="selfieMsg" style="color:#64748b;font-size:13px;text-align:center;margin-top:10px">Starting camera…</div>
+    <button id="captureBtn" class="btn-primary" style="display:none" onclick="captureSelfie()">Take Photo</button>
+    <button id="retakeBtn" class="btn-secondary" style="display:none" onclick="retakeSelfie()">↺ Retake</button>
+    <button id="confirmBtn" class="btn-primary" style="display:none" onclick="confirmSelfie()">✓ Use This Photo</button>
+    <button class="btn-ghost" onclick="stopCamera();STATE.workerStep='form';renderWorkerStep()">← Back</button>
+  `;
+  startCamera();
+}
+
+function startCamera() {
+  const overlay = document.getElementById('selfieOverlay');
+  const msg = document.getElementById('selfieMsg');
+  const captureBtn = document.getElementById('captureBtn');
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false })
+    .then(stream => {
+      selfieStream = stream;
+      const video = document.getElementById('selfieVideo');
+      if (video) { video.srcObject = stream; video.onloadedmetadata = () => { if(overlay) overlay.style.display='none'; if(msg) msg.textContent='Position your face in the frame'; if(captureBtn) captureBtn.style.display='block'; }; }
+    })
+    .catch(() => {
+      if(overlay) overlay.style.display='none';
+      if(msg) msg.textContent='Camera not available — tap below to continue';
+      if(captureBtn) { captureBtn.textContent='Continue without photo'; captureBtn.style.display='block'; captureBtn.onclick = () => { STATE.selfieData='no-camera'; confirmSelfie(); }; }
+    });
+}
+
+function stopCamera() {
+  if (selfieStream) { selfieStream.getTracks().forEach(t => t.stop()); selfieStream = null; }
+}
+
+function captureSelfie() {
+  const video = document.getElementById('selfieVideo');
+  const canvas = document.getElementById('selfieCanvas');
+  const preview = document.getElementById('selfiePreview');
+  const captureBtn = document.getElementById('captureBtn');
+  const retakeBtn = document.getElementById('retakeBtn');
+  const confirmBtn = document.getElementById('confirmBtn');
+  const msg = document.getElementById('selfieMsg');
+  if (!video || !canvas) return;
+  canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+  STATE.selfieData = canvas.toDataURL('image/jpeg', 0.7);
+  preview.src = STATE.selfieData; preview.style.display='block'; video.style.display='none';
+  if(captureBtn) captureBtn.style.display='none';
+  if(retakeBtn) retakeBtn.style.display='block';
+  if(confirmBtn) confirmBtn.style.display='block';
+  if(msg) msg.textContent='Looking good! Confirm or retake.';
+  stopCamera();
+}
+
+function retakeSelfie() {
+  STATE.selfieData = null;
+  const video = document.getElementById('selfieVideo');
+  const preview = document.getElementById('selfiePreview');
+  const captureBtn = document.getElementById('captureBtn');
+  const retakeBtn = document.getElementById('retakeBtn');
+  const confirmBtn = document.getElementById('confirmBtn');
+  const msg = document.getElementById('selfieMsg');
+  if(video) video.style.display='block';
+  if(preview) preview.style.display='none';
+  if(captureBtn) captureBtn.style.display='block';
+  if(retakeBtn) retakeBtn.style.display='none';
+  if(confirmBtn) confirmBtn.style.display='none';
+  if(msg) msg.textContent='Position your face in the frame';
+  startCamera();
+}
+
+function confirmSelfie() {
+  stopCamera();
   workerSubmit();
 }
 
@@ -501,7 +587,7 @@ function doGPSCheck() {
 }
 
 function workerSubmit() {
-  const record = { id:genId(), siteId:STATE.selectedSite.id, siteName:STATE.selectedSite.name, name:STATE.workerName, action:STATE.workerAction, timestamp:new Date().toISOString(), date:fmt.today(), distance:STATE.gpsDistance };
+  const record = { id:genId(), siteId:STATE.selectedSite.id, siteName:STATE.selectedSite.name, name:STATE.workerName, action:STATE.workerAction, timestamp:new Date().toISOString(), date:fmt.today(), distance:STATE.gpsDistance, selfie:STATE.selfieData||null };
   const dayKey = `klok:records:${STATE.selectedSite.id}:${fmt.today()}`;
   const existing = DB.get(dayKey) || [];
   existing.push(record);
